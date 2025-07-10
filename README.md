@@ -15,12 +15,14 @@ local highlightColors = {
 }
 
 -- Propriedades visuais highlight
-local fillTransparency = 0.15
+local fillTransparency = 0.08
 local outlineTransparency = 0.0
 
 -- Speed/Jump Config
 local walkSpeed = 16
 local jumpPower = 50
+local maxSpeed = 200
+local maxJump = 400
 
 -- Função para aplicar highlight a todos os jogadores (exceto você)
 local function setESPState(state)
@@ -95,6 +97,7 @@ MainFrame.BackgroundColor3 = Color3.fromRGB(25,25,32)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
+MainFrame.ZIndex = 2
 MainFrame.Parent = ScreenGui
 
 -- Arredondamento
@@ -112,6 +115,7 @@ Title.Text = "Notzin"
 Title.TextSize = 28
 Title.TextColor3 = Color3.fromRGB(170, 85, 255)
 Title.Parent = MainFrame
+Title.ZIndex = 2
 
 -- Barra lateral de abas
 local sideBar = Instance.new("Frame")
@@ -119,6 +123,7 @@ sideBar.Size = UDim2.new(0, 92, 1, -36)
 sideBar.Position = UDim2.new(0,0,0,36)
 sideBar.BackgroundColor3 = Color3.fromRGB(30,30,45)
 sideBar.BorderSizePixel = 0
+sideBar.ZIndex = 2
 sideBar.Parent = MainFrame
 
 local sideBarCorner = Instance.new("UICorner")
@@ -147,6 +152,7 @@ for i, name in ipairs(tabNames) do
     btn.TextSize = 20
     btn.TextColor3 = Color3.fromRGB(230, 230, 255)
     btn.AutoButtonColor = true
+    btn.ZIndex = 2
     btn.Parent = sideBar
     btn.MouseButton1Click:Connect(function() showTab(i) end)
     tabButtons[i] = btn
@@ -156,6 +162,7 @@ for i, name in ipairs(tabNames) do
     content.Position = UDim2.new(0, 102, 0, 40)
     content.BackgroundTransparency = 1
     content.Visible = false
+    content.ZIndex = 2
     content.Parent = MainFrame
     tabContents[i] = content
 end
@@ -169,17 +176,31 @@ local function createSlider(labelText, minValue, maxValue, startValue, posY, cal
     label.Position = UDim2.new(0, 10, 0, posY)
     label.BackgroundTransparency = 1
     label.Font = Enum.Font.Gotham
-    label.Text = labelText .. ": " .. tostring(startValue)
+    label.Text = labelText .. ":"
     label.TextSize = 17
     label.TextColor3 = Color3.fromRGB(220,220,255)
     label.TextXAlignment = Enum.TextXAlignment.Left
+    label.ZIndex = 2
     label.Parent = mainTab
+
+    local valueLabel = Instance.new("TextLabel")
+    valueLabel.Size = UDim2.new(0, 60, 0, 24)
+    valueLabel.Position = UDim2.new(0, 210, 0, posY)
+    valueLabel.BackgroundTransparency = 1
+    valueLabel.Font = Enum.Font.GothamBold
+    valueLabel.Text = tostring(startValue)
+    valueLabel.TextSize = 17
+    valueLabel.TextColor3 = Color3.fromRGB(120,255,120)
+    valueLabel.TextXAlignment = Enum.TextXAlignment.Left
+    valueLabel.ZIndex = 2
+    valueLabel.Parent = mainTab
 
     local sliderBG = Instance.new("Frame")
     sliderBG.Size = UDim2.new(0,170,0,8)
     sliderBG.Position = UDim2.new(0, 120, 0, posY+8)
     sliderBG.BackgroundColor3 = Color3.fromRGB(40,40,60)
     sliderBG.BorderSizePixel = 0
+    sliderBG.ZIndex = 2
     sliderBG.Parent = mainTab
     local cornerBG = Instance.new("UICorner")
     cornerBG.CornerRadius = UDim.new(0,4)
@@ -189,6 +210,7 @@ local function createSlider(labelText, minValue, maxValue, startValue, posY, cal
     sliderFill.Size = UDim2.new((startValue-minValue)/(maxValue-minValue),0,1,0)
     sliderFill.BackgroundColor3 = Color3.fromRGB(110,85,200)
     sliderFill.BorderSizePixel = 0
+    sliderFill.ZIndex = 2
     sliderFill.Parent = sliderBG
     local cornerFill = Instance.new("UICorner")
     cornerFill.CornerRadius = UDim.new(0,4)
@@ -212,19 +234,19 @@ local function createSlider(labelText, minValue, maxValue, startValue, posY, cal
             local pct = x/sliderBG.AbsoluteSize.X
             local value = math.floor(minValue + (maxValue-minValue)*pct + 0.5)
             sliderFill.Size = UDim2.new(pct,0,1,0)
-            label.Text = labelText .. ": " .. tostring(value)
+            valueLabel.Text = tostring(value)
             callback(value)
         end
     end)
 end
 
-createSlider("Speed", 8, 100, walkSpeed, 10, function(val)
+createSlider("Speed", 8, maxSpeed, walkSpeed, 10, function(val)
     walkSpeed = val
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
         LocalPlayer.Character.Humanoid.WalkSpeed = walkSpeed
     end
 end)
-createSlider("Jump Power", 20, 200, jumpPower, 54, function(val)
+createSlider("Jump Power", 20, maxJump, jumpPower, 54, function(val)
     jumpPower = val
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
         LocalPlayer.Character.Humanoid.JumpPower = jumpPower
@@ -233,8 +255,9 @@ end)
 
 -- Ajusta valores ao spawnar
 LocalPlayer.CharacterAdded:Connect(function(char)
-    char:WaitForChild("Humanoid").WalkSpeed = walkSpeed
-    char:WaitForChild("Humanoid").JumpPower = jumpPower
+    local hum = char:WaitForChild("Humanoid")
+    hum.WalkSpeed = walkSpeed
+    hum.JumpPower = jumpPower
 end)
 
 -- ESP TAB
@@ -248,6 +271,7 @@ toggleESPBtn.Font = Enum.Font.GothamBold
 toggleESPBtn.TextSize = 20
 toggleESPBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleESPBtn.AutoButtonColor = true
+toggleESPBtn.ZIndex = 2
 toggleESPBtn.Parent = EspTab
 
 local function updateToggleESPBtn()
@@ -271,6 +295,7 @@ colorLabel.Text = "Cor do Highlight:"
 colorLabel.TextSize = 18
 colorLabel.TextColor3 = Color3.fromRGB(240, 230, 255)
 colorLabel.TextXAlignment = Enum.TextXAlignment.Left
+colorLabel.ZIndex = 2
 colorLabel.Parent = EspTab
 
 local colorDropdown = Instance.new("TextButton")
@@ -281,15 +306,17 @@ colorDropdown.Font = Enum.Font.GothamSemibold
 colorDropdown.TextSize = 18
 colorDropdown.TextColor3 = Color3.fromRGB(230, 210, 255)
 colorDropdown.Text = highlightColor
+colorDropdown.ZIndex = 3 -- ZIndex alto para ficar sobre qualquer outro
 colorDropdown.Parent = EspTab
 
 local dropOpen = false
 local colorOptionsFrame = Instance.new("Frame")
 colorOptionsFrame.Size = UDim2.new(1, 0, 0, 106)
-colorOptionsFrame.Position = UDim2.new(0, 0, 1, 0)
+colorOptionsFrame.Position = UDim2.new(0, 0, 0, 26)
 colorOptionsFrame.BackgroundColor3 = Color3.fromRGB(30, 15, 45)
 colorOptionsFrame.BorderSizePixel = 0
 colorOptionsFrame.Visible = false
+colorOptionsFrame.ZIndex = 4 -- Acima de tudo
 colorOptionsFrame.Parent = colorDropdown
 local colorCorner = Instance.new("UICorner")
 colorCorner.CornerRadius = UDim.new(0,6)
@@ -304,6 +331,7 @@ for idx, cname in ipairs({"Roxo", "Amarelo", "Verde", "Azul"}) do
     opt.Font = Enum.Font.Gotham
     opt.TextSize = 18
     opt.TextColor3 = Color3.fromRGB(230,230,255)
+    opt.ZIndex = 5
     opt.Parent = colorOptionsFrame
     opt.MouseButton1Click:Connect(function()
         highlightColor = cname
@@ -316,6 +344,8 @@ end
 colorDropdown.MouseButton1Click:Connect(function()
     dropOpen = not dropOpen
     colorOptionsFrame.Visible = dropOpen
+    colorOptionsFrame.ZIndex = 4
+    colorDropdown.ZIndex = dropOpen and 5 or 3
 end)
 
 -- Keybind setting
@@ -327,6 +357,7 @@ keybindLabel.Font = Enum.Font.Gotham
 keybindLabel.Text = "Tecla para toggle:"
 keybindLabel.TextSize = 18
 keybindLabel.TextColor3 = Color3.fromRGB(230, 210, 255)
+keybindLabel.ZIndex = 2
 keybindLabel.Parent = EspTab
 
 local keybindBtn = Instance.new("TextButton")
@@ -337,6 +368,7 @@ keybindBtn.Font = Enum.Font.GothamSemibold
 keybindBtn.TextSize = 18
 keybindBtn.TextColor3 = Color3.fromRGB(230, 210, 255)
 keybindBtn.Text = toggleKey.Name
+keybindBtn.ZIndex = 2
 keybindBtn.Parent = EspTab
 
 local waitingForKey = false
@@ -376,6 +408,7 @@ infoLabel.TextWrapped = true
 infoLabel.Text = "Menu ESP feito por Notzin.\n\nAba Esp: Ative/desative o ESP, escolha cor, configure tecla toggle.\nAba Main: Speed/JumpPower do seu personagem.\n\nMenu arredondado, abas laterais, abre/fecha com P."
 infoLabel.TextSize = 18
 infoLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
+infoLabel.ZIndex = 2
 infoLabel.Parent = infoTab
 
 -- Inicializa exibindo Main tab
