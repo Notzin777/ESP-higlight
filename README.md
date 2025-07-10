@@ -2,11 +2,27 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
+-- Configurações Highlight
 local ESP_ENABLED = false
 local HIGHLIGHT_NAME = "PurpleESP_Highlight"
 local toggleKey = Enum.KeyCode.F -- Tecla padrão
+local highlightColor = "Roxo" -- Inicial
+local highlightColors = {
+    ["Roxo"] = {fill = Color3.fromRGB(128,0,128), outline = Color3.fromRGB(200,0,200)},
+    ["Amarelo"] = {fill = Color3.fromRGB(255,255,0), outline = Color3.fromRGB(255,255,90)},
+    ["Verde"] = {fill = Color3.fromRGB(0,255,0), outline = Color3.fromRGB(90,255,90)},
+    ["Azul"] = {fill = Color3.fromRGB(0,128,255), outline = Color3.fromRGB(0,200,255)},
+}
 
--- Função para aplicar/remover ESP
+-- Propriedades visuais highlight
+local fillTransparency = 0.15
+local outlineTransparency = 0.0
+
+-- Speed/Jump Config
+local walkSpeed = 16
+local jumpPower = 50
+
+-- Função para aplicar highlight a todos os jogadores (exceto você)
 local function setESPState(state)
     ESP_ENABLED = state
     for _, player in ipairs(Players:GetPlayers()) do
@@ -16,10 +32,11 @@ local function setESPState(state)
                 if not existing then
                     local highlight = Instance.new("Highlight")
                     highlight.Name = HIGHLIGHT_NAME
-                    highlight.FillColor = Color3.fromRGB(128, 0, 128)
-                    highlight.OutlineColor = Color3.fromRGB(200, 0, 200)
-                    highlight.FillTransparency = 0.5
-                    highlight.OutlineTransparency = 0
+                    local color = highlightColors[highlightColor]
+                    highlight.FillColor = color.fill
+                    highlight.OutlineColor = color.outline
+                    highlight.FillTransparency = fillTransparency
+                    highlight.OutlineTransparency = outlineTransparency
                     highlight.Adornee = player.Character
                     highlight.Parent = player.Character
                 end
@@ -32,16 +49,33 @@ local function setESPState(state)
     end
 end
 
+-- Atualiza cor dos highlights ativos
+local function updateHighlightColors()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local h = player.Character:FindFirstChild(HIGHLIGHT_NAME)
+            if h and h:IsA("Highlight") then
+                local color = highlightColors[highlightColor]
+                h.FillColor = color.fill
+                h.OutlineColor = color.outline
+                h.FillTransparency = fillTransparency
+                h.OutlineTransparency = outlineTransparency
+            end
+        end
+    end
+end
+
 -- Atualiza ESP quando novos jogadores entram
 Players.PlayerAdded:Connect(function(player)
     player.CharacterAdded:Connect(function(char)
         if ESP_ENABLED then
             local highlight = Instance.new("Highlight")
             highlight.Name = HIGHLIGHT_NAME
-            highlight.FillColor = Color3.fromRGB(128, 0, 128)
-            highlight.OutlineColor = Color3.fromRGB(200, 0, 200)
-            highlight.FillTransparency = 0.5
-            highlight.OutlineTransparency = 0
+            local color = highlightColors[highlightColor]
+            highlight.FillColor = color.fill
+            highlight.OutlineColor = color.outline
+            highlight.FillTransparency = fillTransparency
+            highlight.OutlineTransparency = outlineTransparency
             highlight.Adornee = char
             highlight.Parent = char
         end
@@ -52,26 +86,44 @@ end)
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "NotzinESPMenu"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 350, 0, 250)
-MainFrame.Position = UDim2.new(0.5, -175, 0.4, -125)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
+MainFrame.Size = UDim2.new(0, 410, 0, 290)
+MainFrame.Position = UDim2.new(0.5, -205, 0.4, -145)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25,25,32)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 
+-- Arredondamento
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 18)
+UICorner.Parent = MainFrame
+
+-- Título centralizado
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 36)
 Title.Position = UDim2.new(0, 0, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "notzin"
+Title.Text = "Notzin"
 Title.TextSize = 28
 Title.TextColor3 = Color3.fromRGB(170, 85, 255)
 Title.Parent = MainFrame
+
+-- Barra lateral de abas
+local sideBar = Instance.new("Frame")
+sideBar.Size = UDim2.new(0, 92, 1, -36)
+sideBar.Position = UDim2.new(0,0,0,36)
+sideBar.BackgroundColor3 = Color3.fromRGB(30,30,45)
+sideBar.BorderSizePixel = 0
+sideBar.Parent = MainFrame
+
+local sideBarCorner = Instance.new("UICorner")
+sideBarCorner.CornerRadius = UDim.new(0, 14)
+sideBarCorner.Parent = sideBar
 
 -- Abas
 local tabNames = {"Main", "Esp", "Info"}
@@ -81,57 +133,111 @@ local tabContents = {}
 local function showTab(idx)
     for i, c in ipairs(tabContents) do
         c.Visible = (i == idx)
-        tabButtons[i].BackgroundColor3 = (i == idx) and Color3.fromRGB(80, 60, 100) or Color3.fromRGB(30, 30, 40)
+        tabButtons[i].BackgroundColor3 = (i == idx) and Color3.fromRGB(80, 60, 100) or Color3.fromRGB(30, 30, 45)
     end
 end
 
 for i, name in ipairs(tabNames) do
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 110, 0, 28)
-    btn.Position = UDim2.new(0, (i-1)*112, 0, 38)
-    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    btn.Size = UDim2.new(1, -16, 0, 38)
+    btn.Position = UDim2.new(0, 8, 0, 12 + (i-1)*46)
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
     btn.Font = Enum.Font.GothamSemibold
     btn.Text = name
     btn.TextSize = 20
     btn.TextColor3 = Color3.fromRGB(230, 230, 255)
     btn.AutoButtonColor = true
-    btn.Parent = MainFrame
+    btn.Parent = sideBar
     btn.MouseButton1Click:Connect(function() showTab(i) end)
     tabButtons[i] = btn
 
     local content = Instance.new("Frame")
-    content.Size = UDim2.new(1, -10, 1, -75)
-    content.Position = UDim2.new(0, 5, 0, 70)
+    content.Size = UDim2.new(1,-110,1,-42)
+    content.Position = UDim2.new(0, 102, 0, 40)
     content.BackgroundTransparency = 1
     content.Visible = false
     content.Parent = MainFrame
     tabContents[i] = content
 end
 
--- Main Tab (só exemplo, pode adicionar opções)
-local mainLabel = Instance.new("TextLabel")
-mainLabel.Size = UDim2.new(1, 0, 0, 32)
-mainLabel.Position = UDim2.new(0, 0, 0, 0)
-mainLabel.BackgroundTransparency = 1
-mainLabel.Font = Enum.Font.Gotham
-mainLabel.Text = "Bem-vindo ao menu notzin!"
-mainLabel.TextSize = 20
-mainLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-mainLabel.Parent = tabContents[1]
+-- MAIN TAB: Speed/Jump sliders
+local mainTab = tabContents[1]
 
--- Info Tab
-local infoLabel = Instance.new("TextLabel")
-infoLabel.Size = UDim2.new(1, 0, 1, 0)
-infoLabel.Position = UDim2.new(0, 0, 0, 0)
-infoLabel.BackgroundTransparency = 1
-infoLabel.Font = Enum.Font.Gotham
-infoLabel.TextWrapped = true
-infoLabel.Text = "Menu ESP feito por notzin.\n\nAba Esp: Ative/desative o ESP roxo nos jogadores.\nConfiguração de tecla também disponível."
-infoLabel.TextSize = 18
-infoLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
-infoLabel.Parent = tabContents[3]
+local function createSlider(labelText, minValue, maxValue, startValue, posY, callback)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0, 110, 0, 24)
+    label.Position = UDim2.new(0, 10, 0, posY)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.Gotham
+    label.Text = labelText .. ": " .. tostring(startValue)
+    label.TextSize = 17
+    label.TextColor3 = Color3.fromRGB(220,220,255)
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = mainTab
 
--- ESP Tab
+    local sliderBG = Instance.new("Frame")
+    sliderBG.Size = UDim2.new(0,170,0,8)
+    sliderBG.Position = UDim2.new(0, 120, 0, posY+8)
+    sliderBG.BackgroundColor3 = Color3.fromRGB(40,40,60)
+    sliderBG.BorderSizePixel = 0
+    sliderBG.Parent = mainTab
+    local cornerBG = Instance.new("UICorner")
+    cornerBG.CornerRadius = UDim.new(0,4)
+    cornerBG.Parent = sliderBG
+
+    local sliderFill = Instance.new("Frame")
+    sliderFill.Size = UDim2.new((startValue-minValue)/(maxValue-minValue),0,1,0)
+    sliderFill.BackgroundColor3 = Color3.fromRGB(110,85,200)
+    sliderFill.BorderSizePixel = 0
+    sliderFill.Parent = sliderBG
+    local cornerFill = Instance.new("UICorner")
+    cornerFill.CornerRadius = UDim.new(0,4)
+    cornerFill.Parent = sliderFill
+
+    local dragging = false
+
+    sliderBG.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local x = math.clamp(input.Position.X - sliderBG.AbsolutePosition.X, 0, sliderBG.AbsoluteSize.X)
+            local pct = x/sliderBG.AbsoluteSize.X
+            local value = math.floor(minValue + (maxValue-minValue)*pct + 0.5)
+            sliderFill.Size = UDim2.new(pct,0,1,0)
+            label.Text = labelText .. ": " .. tostring(value)
+            callback(value)
+        end
+    end)
+end
+
+createSlider("Speed", 8, 100, walkSpeed, 10, function(val)
+    walkSpeed = val
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        LocalPlayer.Character.Humanoid.WalkSpeed = walkSpeed
+    end
+end)
+createSlider("Jump Power", 20, 200, jumpPower, 54, function(val)
+    jumpPower = val
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        LocalPlayer.Character.Humanoid.JumpPower = jumpPower
+    end
+end)
+
+-- Ajusta valores ao spawnar
+LocalPlayer.CharacterAdded:Connect(function(char)
+    char:WaitForChild("Humanoid").WalkSpeed = walkSpeed
+    char:WaitForChild("Humanoid").JumpPower = jumpPower
+end)
+
+-- ESP TAB
 local EspTab = tabContents[2]
 
 local toggleESPBtn = Instance.new("TextButton")
@@ -153,13 +259,69 @@ toggleESPBtn.MouseButton1Click:Connect(function()
     setESPState(not ESP_ENABLED)
     updateToggleESPBtn()
 end)
-
 updateToggleESPBtn()
+
+-- Seletor de cor do highlight
+local colorLabel = Instance.new("TextLabel")
+colorLabel.Size = UDim2.new(0, 140, 0, 26)
+colorLabel.Position = UDim2.new(0, 8, 0, 62)
+colorLabel.BackgroundTransparency = 1
+colorLabel.Font = Enum.Font.Gotham
+colorLabel.Text = "Cor do Highlight:"
+colorLabel.TextSize = 18
+colorLabel.TextColor3 = Color3.fromRGB(240, 230, 255)
+colorLabel.TextXAlignment = Enum.TextXAlignment.Left
+colorLabel.Parent = EspTab
+
+local colorDropdown = Instance.new("TextButton")
+colorDropdown.Size = UDim2.new(0, 90, 0, 26)
+colorDropdown.Position = UDim2.new(0, 150, 0, 62)
+colorDropdown.BackgroundColor3 = Color3.fromRGB(40, 20, 60)
+colorDropdown.Font = Enum.Font.GothamSemibold
+colorDropdown.TextSize = 18
+colorDropdown.TextColor3 = Color3.fromRGB(230, 210, 255)
+colorDropdown.Text = highlightColor
+colorDropdown.Parent = EspTab
+
+local dropOpen = false
+local colorOptionsFrame = Instance.new("Frame")
+colorOptionsFrame.Size = UDim2.new(1, 0, 0, 106)
+colorOptionsFrame.Position = UDim2.new(0, 0, 1, 0)
+colorOptionsFrame.BackgroundColor3 = Color3.fromRGB(30, 15, 45)
+colorOptionsFrame.BorderSizePixel = 0
+colorOptionsFrame.Visible = false
+colorOptionsFrame.Parent = colorDropdown
+local colorCorner = Instance.new("UICorner")
+colorCorner.CornerRadius = UDim.new(0,6)
+colorCorner.Parent = colorOptionsFrame
+
+for idx, cname in ipairs({"Roxo", "Amarelo", "Verde", "Azul"}) do
+    local opt = Instance.new("TextButton")
+    opt.Size = UDim2.new(1,0,0,24)
+    opt.Position = UDim2.new(0,0,0,(idx-1)*26)
+    opt.BackgroundColor3 = Color3.fromRGB(40, 20, 60)
+    opt.Text = cname
+    opt.Font = Enum.Font.Gotham
+    opt.TextSize = 18
+    opt.TextColor3 = Color3.fromRGB(230,230,255)
+    opt.Parent = colorOptionsFrame
+    opt.MouseButton1Click:Connect(function()
+        highlightColor = cname
+        colorDropdown.Text = cname
+        colorOptionsFrame.Visible = false
+        dropOpen = false
+        updateHighlightColors()
+    end)
+end
+colorDropdown.MouseButton1Click:Connect(function()
+    dropOpen = not dropOpen
+    colorOptionsFrame.Visible = dropOpen
+end)
 
 -- Keybind setting
 local keybindLabel = Instance.new("TextLabel")
 keybindLabel.Size = UDim2.new(0, 160, 0, 28)
-keybindLabel.Position = UDim2.new(0, 8, 0, 60)
+keybindLabel.Position = UDim2.new(0, 8, 0, 102)
 keybindLabel.BackgroundTransparency = 1
 keybindLabel.Font = Enum.Font.Gotham
 keybindLabel.Text = "Tecla para toggle:"
@@ -169,7 +331,7 @@ keybindLabel.Parent = EspTab
 
 local keybindBtn = Instance.new("TextButton")
 keybindBtn.Size = UDim2.new(0, 70, 0, 28)
-keybindBtn.Position = UDim2.new(0, 172, 0, 60)
+keybindBtn.Position = UDim2.new(0, 172, 0, 102)
 keybindBtn.BackgroundColor3 = Color3.fromRGB(40, 20, 60)
 keybindBtn.Font = Enum.Font.GothamSemibold
 keybindBtn.TextSize = 18
@@ -202,6 +364,19 @@ UserInputService.InputBegan:Connect(function(input, processed)
         end
     end
 end)
+
+-- INFO TAB
+local infoTab = tabContents[3]
+local infoLabel = Instance.new("TextLabel")
+infoLabel.Size = UDim2.new(1, 0, 1, 0)
+infoLabel.Position = UDim2.new(0, 0, 0, 0)
+infoLabel.BackgroundTransparency = 1
+infoLabel.Font = Enum.Font.Gotham
+infoLabel.TextWrapped = true
+infoLabel.Text = "Menu ESP feito por Notzin.\n\nAba Esp: Ative/desative o ESP, escolha cor, configure tecla toggle.\nAba Main: Speed/JumpPower do seu personagem.\n\nMenu arredondado, abas laterais, abre/fecha com P."
+infoLabel.TextSize = 18
+infoLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
+infoLabel.Parent = infoTab
 
 -- Inicializa exibindo Main tab
 showTab(1)
