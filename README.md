@@ -1,11 +1,22 @@
+--[[
+LocalScript para Roblox - GUI ESP Menu Ultra Customizado
+- Sliders: texto e valor lado a lado, barra embaixo, arredondados
+- Não move o menu quando arrasta o slider
+- Todas opções arredondadas
+- Opção Invisível: botão de ativar/desativar + escolher tecla; funciona com GUI fechado
+- Atalhos (ESP/Invisível) funcionam com GUI fechado
+- Menu arredondado, abas laterais, abre/fecha com P
+--]]
+
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
 
 -- Configurações Highlight
 local ESP_ENABLED = false
 local HIGHLIGHT_NAME = "PurpleESP_Highlight"
-local toggleKey = Enum.KeyCode.F -- Tecla padrão
+local toggleKey = Enum.KeyCode.F -- Tecla padrão ESP
 local highlightColor = "Roxo" -- Inicial
 local highlightColors = {
     ["Roxo"] = {fill = Color3.fromRGB(128,0,128), outline = Color3.fromRGB(200,0,200)},
@@ -13,8 +24,6 @@ local highlightColors = {
     ["Verde"] = {fill = Color3.fromRGB(0,255,0), outline = Color3.fromRGB(90,255,90)},
     ["Azul"] = {fill = Color3.fromRGB(0,128,255), outline = Color3.fromRGB(0,200,255)},
 }
-
--- Propriedades visuais highlight
 local fillTransparency = 0.08
 local outlineTransparency = 0.0
 
@@ -24,7 +33,59 @@ local jumpPower = 50
 local maxSpeed = 200
 local maxJump = 400
 
--- Função para aplicar highlight a todos os jogadores (exceto você)
+-- Invisível
+local INVIS_ENABLED = false
+local INVIS_KEY = Enum.KeyCode.T
+local invisParts = {}
+
+-- Função para tornar invisível
+local function setInvisible(state)
+    INVIS_ENABLED = state
+    local char = LocalPlayer.Character
+    if char then
+        for _,part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                if state then
+                    if not invisParts[part] then
+                        invisParts[part] = part.Transparency
+                    end
+                    part.Transparency = 1
+                    part.CanCollide = false
+                    if part:IsA("Decal") then
+                        part.Transparency = 1
+                    end
+                else
+                    if invisParts[part] then
+                        part.Transparency = invisParts[part]
+                        invisParts[part] = nil
+                    end
+                    part.CanCollide = true
+                    if part:IsA("Decal") then
+                        part.Transparency = 0
+                    end
+                end
+            elseif part:IsA("Decal") then
+                if state then
+                    part.Transparency = 1
+                else
+                    part.Transparency = 0
+                end
+            end
+        end
+        -- Esconde acessórios
+        for _, acc in ipairs(char:GetChildren()) do
+            if acc:IsA("Accessory") and acc:FindFirstChild("Handle") then
+                if state then
+                    acc.Handle.Transparency = 1
+                else
+                    acc.Handle.Transparency = 0
+                end
+            end
+        end
+    end
+end
+
+-- ESP Highlight
 local function setESPState(state)
     ESP_ENABLED = state
     for _, player in ipairs(Players:GetPlayers()) do
@@ -51,7 +112,6 @@ local function setESPState(state)
     end
 end
 
--- Atualiza cor dos highlights ativos
 local function updateHighlightColors()
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
@@ -67,7 +127,6 @@ local function updateHighlightColors()
     end
 end
 
--- Atualiza ESP quando novos jogadores entram
 Players.PlayerAdded:Connect(function(player)
     player.CharacterAdded:Connect(function(char)
         if ESP_ENABLED then
@@ -91,8 +150,8 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 410, 0, 290)
-MainFrame.Position = UDim2.new(0.5, -205, 0.4, -145)
+MainFrame.Size = UDim2.new(0, 430, 0, 320)
+MainFrame.Position = UDim2.new(0.5, -215, 0.4, -160)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25,25,32)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
@@ -100,10 +159,9 @@ MainFrame.Draggable = true
 MainFrame.ZIndex = 2
 MainFrame.Parent = ScreenGui
 
--- Arredondamento
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 18)
-UICorner.Parent = MainFrame
+local UICorner_Main = Instance.new("UICorner")
+UICorner_Main.CornerRadius = UDim.new(0, 18)
+UICorner_Main.Parent = MainFrame
 
 -- Título centralizado
 local Title = Instance.new("TextLabel")
@@ -126,9 +184,9 @@ sideBar.BorderSizePixel = 0
 sideBar.ZIndex = 2
 sideBar.Parent = MainFrame
 
-local sideBarCorner = Instance.new("UICorner")
-sideBarCorner.CornerRadius = UDim.new(0, 14)
-sideBarCorner.Parent = sideBar
+local UICorner_sideBar = Instance.new("UICorner")
+UICorner_sideBar.CornerRadius = UDim.new(0, 14)
+UICorner_sideBar.Parent = sideBar
 
 -- Abas
 local tabNames = {"Main", "Esp", "Info"}
@@ -154,6 +212,9 @@ for i, name in ipairs(tabNames) do
     btn.AutoButtonColor = true
     btn.ZIndex = 2
     btn.Parent = sideBar
+    local UICorner_btn = Instance.new("UICorner")
+    UICorner_btn.CornerRadius = UDim.new(0, 8)
+    UICorner_btn.Parent = btn
     btn.MouseButton1Click:Connect(function() showTab(i) end)
     tabButtons[i] = btn
 
@@ -167,12 +228,12 @@ for i, name in ipairs(tabNames) do
     tabContents[i] = content
 end
 
--- MAIN TAB: Speed/Jump sliders
+-- MAIN TAB: Sliders e Invisível
 local mainTab = tabContents[1]
 
-local function createSlider(labelText, minValue, maxValue, startValue, posY, callback)
+local function createSlider(labelText, minValue, maxValue, startValue, posY, callback, valueColor)
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0, 110, 0, 24)
+    label.Size = UDim2.new(0, 120, 0, 24)
     label.Position = UDim2.new(0, 10, 0, posY)
     label.BackgroundTransparency = 1
     label.Font = Enum.Font.Gotham
@@ -184,27 +245,27 @@ local function createSlider(labelText, minValue, maxValue, startValue, posY, cal
     label.Parent = mainTab
 
     local valueLabel = Instance.new("TextLabel")
-    valueLabel.Size = UDim2.new(0, 60, 0, 24)
-    valueLabel.Position = UDim2.new(0, 210, 0, posY)
+    valueLabel.Size = UDim2.new(0, 54, 0, 24)
+    valueLabel.Position = UDim2.new(0, 130, 0, posY)
     valueLabel.BackgroundTransparency = 1
     valueLabel.Font = Enum.Font.GothamBold
     valueLabel.Text = tostring(startValue)
     valueLabel.TextSize = 17
-    valueLabel.TextColor3 = Color3.fromRGB(120,255,120)
+    valueLabel.TextColor3 = valueColor or Color3.fromRGB(120,255,120)
     valueLabel.TextXAlignment = Enum.TextXAlignment.Left
     valueLabel.ZIndex = 2
     valueLabel.Parent = mainTab
 
     local sliderBG = Instance.new("Frame")
-    sliderBG.Size = UDim2.new(0,170,0,8)
-    sliderBG.Position = UDim2.new(0, 120, 0, posY+8)
+    sliderBG.Size = UDim2.new(0, 220, 0, 12)
+    sliderBG.Position = UDim2.new(0, 10, 0, posY+26)
     sliderBG.BackgroundColor3 = Color3.fromRGB(40,40,60)
     sliderBG.BorderSizePixel = 0
     sliderBG.ZIndex = 2
     sliderBG.Parent = mainTab
-    local cornerBG = Instance.new("UICorner")
-    cornerBG.CornerRadius = UDim.new(0,4)
-    cornerBG.Parent = sliderBG
+    local UICorner_BG = Instance.new("UICorner")
+    UICorner_BG.CornerRadius = UDim.new(0, 6)
+    UICorner_BG.Parent = sliderBG
 
     local sliderFill = Instance.new("Frame")
     sliderFill.Size = UDim2.new((startValue-minValue)/(maxValue-minValue),0,1,0)
@@ -212,9 +273,9 @@ local function createSlider(labelText, minValue, maxValue, startValue, posY, cal
     sliderFill.BorderSizePixel = 0
     sliderFill.ZIndex = 2
     sliderFill.Parent = sliderBG
-    local cornerFill = Instance.new("UICorner")
-    cornerFill.CornerRadius = UDim.new(0,4)
-    cornerFill.Parent = sliderFill
+    local UICorner_Fill = Instance.new("UICorner")
+    UICorner_Fill.CornerRadius = UDim.new(0, 6)
+    UICorner_Fill.Parent = sliderFill
 
     local dragging = false
 
@@ -245,19 +306,78 @@ createSlider("Speed", 8, maxSpeed, walkSpeed, 10, function(val)
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
         LocalPlayer.Character.Humanoid.WalkSpeed = walkSpeed
     end
-end)
-createSlider("Jump Power", 20, maxJump, jumpPower, 54, function(val)
+end, Color3.fromRGB(120,255,120))
+
+createSlider("Jump Power", 20, maxJump, jumpPower, 60, function(val)
     jumpPower = val
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
         LocalPlayer.Character.Humanoid.JumpPower = jumpPower
     end
-end)
+end, Color3.fromRGB(255,220,100))
 
--- Ajusta valores ao spawnar
 LocalPlayer.CharacterAdded:Connect(function(char)
     local hum = char:WaitForChild("Humanoid")
     hum.WalkSpeed = walkSpeed
     hum.JumpPower = jumpPower
+end)
+
+-- Invisível
+local invisBtn = Instance.new("TextButton")
+invisBtn.Size = UDim2.new(0, 180, 0, 38)
+invisBtn.Position = UDim2.new(0, 10, 0, 124)
+invisBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 70)
+invisBtn.Font = Enum.Font.GothamBold
+invisBtn.TextSize = 20
+invisBtn.TextColor3 = Color3.fromRGB(240, 255, 255)
+invisBtn.AutoButtonColor = true
+invisBtn.Text = "Ativar Invisível"
+invisBtn.ZIndex = 2
+invisBtn.Parent = mainTab
+local UICorner_invis = Instance.new("UICorner")
+UICorner_invis.CornerRadius = UDim.new(0, 8)
+UICorner_invis.Parent = invisBtn
+
+local function updateInvisBtn()
+    invisBtn.Text = INVIS_ENABLED and "Desativar Invisível" or "Ativar Invisível"
+    invisBtn.BackgroundColor3 = INVIS_ENABLED and Color3.fromRGB(80, 40, 120) or Color3.fromRGB(40, 40, 70)
+end
+invisBtn.MouseButton1Click:Connect(function()
+    setInvisible(not INVIS_ENABLED)
+    updateInvisBtn()
+end)
+updateInvisBtn()
+
+-- Invisível Keybind
+local invisKeyLabel = Instance.new("TextLabel")
+invisKeyLabel.Size = UDim2.new(0, 160, 0, 28)
+invisKeyLabel.Position = UDim2.new(0, 10, 0, 170)
+invisKeyLabel.BackgroundTransparency = 1
+invisKeyLabel.Font = Enum.Font.Gotham
+invisKeyLabel.Text = "Tecla Invisível:"
+invisKeyLabel.TextSize = 18
+invisKeyLabel.TextColor3 = Color3.fromRGB(230, 210, 255)
+invisKeyLabel.ZIndex = 2
+invisKeyLabel.Parent = mainTab
+
+local invisKeyBtn = Instance.new("TextButton")
+invisKeyBtn.Size = UDim2.new(0, 70, 0, 28)
+invisKeyBtn.Position = UDim2.new(0, 172, 0, 170)
+invisKeyBtn.BackgroundColor3 = Color3.fromRGB(40, 20, 60)
+invisKeyBtn.Font = Enum.Font.GothamSemibold
+invisKeyBtn.TextSize = 18
+invisKeyBtn.TextColor3 = Color3.fromRGB(230, 210, 255)
+invisKeyBtn.Text = INVIS_KEY.Name
+invisKeyBtn.ZIndex = 2
+invisKeyBtn.Parent = mainTab
+local UICorner_invisKey = Instance.new("UICorner")
+UICorner_invisKey.CornerRadius = UDim.new(0, 6)
+UICorner_invisKey.Parent = invisKeyBtn
+
+local waitingInvisKey = false
+invisKeyBtn.MouseButton1Click:Connect(function()
+    if waitingInvisKey then return end
+    invisKeyBtn.Text = "Pressione..."
+    waitingInvisKey = true
 end)
 
 -- ESP TAB
@@ -273,12 +393,14 @@ toggleESPBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleESPBtn.AutoButtonColor = true
 toggleESPBtn.ZIndex = 2
 toggleESPBtn.Parent = EspTab
+local UICorner_esp = Instance.new("UICorner")
+UICorner_esp.CornerRadius = UDim.new(0, 8)
+UICorner_esp.Parent = toggleESPBtn
 
 local function updateToggleESPBtn()
     toggleESPBtn.Text = ESP_ENABLED and "Desativar ESP" or "Ativar ESP"
     toggleESPBtn.BackgroundColor3 = ESP_ENABLED and Color3.fromRGB(100, 40, 120) or Color3.fromRGB(70, 30, 90)
 end
-
 toggleESPBtn.MouseButton1Click:Connect(function()
     setESPState(not ESP_ENABLED)
     updateToggleESPBtn()
@@ -308,6 +430,9 @@ colorDropdown.TextColor3 = Color3.fromRGB(230, 210, 255)
 colorDropdown.Text = highlightColor
 colorDropdown.ZIndex = 3 -- ZIndex alto para ficar sobre qualquer outro
 colorDropdown.Parent = EspTab
+local UICorner_colorDropdown = Instance.new("UICorner")
+UICorner_colorDropdown.CornerRadius = UDim.new(0, 6)
+UICorner_colorDropdown.Parent = colorDropdown
 
 local dropOpen = false
 local colorOptionsFrame = Instance.new("Frame")
@@ -318,9 +443,9 @@ colorOptionsFrame.BorderSizePixel = 0
 colorOptionsFrame.Visible = false
 colorOptionsFrame.ZIndex = 4 -- Acima de tudo
 colorOptionsFrame.Parent = colorDropdown
-local colorCorner = Instance.new("UICorner")
-colorCorner.CornerRadius = UDim.new(0,6)
-colorCorner.Parent = colorOptionsFrame
+local UICorner_colorFrame = Instance.new("UICorner")
+UICorner_colorFrame.CornerRadius = UDim.new(0,6)
+UICorner_colorFrame.Parent = colorOptionsFrame
 
 for idx, cname in ipairs({"Roxo", "Amarelo", "Verde", "Azul"}) do
     local opt = Instance.new("TextButton")
@@ -333,6 +458,9 @@ for idx, cname in ipairs({"Roxo", "Amarelo", "Verde", "Azul"}) do
     opt.TextColor3 = Color3.fromRGB(230,230,255)
     opt.ZIndex = 5
     opt.Parent = colorOptionsFrame
+    local cornerOpt = Instance.new("UICorner")
+    cornerOpt.CornerRadius = UDim.new(0,4)
+    cornerOpt.Parent = opt
     opt.MouseButton1Click:Connect(function()
         highlightColor = cname
         colorDropdown.Text = cname
@@ -354,7 +482,7 @@ keybindLabel.Size = UDim2.new(0, 160, 0, 28)
 keybindLabel.Position = UDim2.new(0, 8, 0, 102)
 keybindLabel.BackgroundTransparency = 1
 keybindLabel.Font = Enum.Font.Gotham
-keybindLabel.Text = "Tecla para toggle:"
+keybindLabel.Text = "Tecla para ESP:"
 keybindLabel.TextSize = 18
 keybindLabel.TextColor3 = Color3.fromRGB(230, 210, 255)
 keybindLabel.ZIndex = 2
@@ -370,31 +498,15 @@ keybindBtn.TextColor3 = Color3.fromRGB(230, 210, 255)
 keybindBtn.Text = toggleKey.Name
 keybindBtn.ZIndex = 2
 keybindBtn.Parent = EspTab
+local UICorner_keybindBtn = Instance.new("UICorner")
+UICorner_keybindBtn.CornerRadius = UDim.new(0, 6)
+UICorner_keybindBtn.Parent = keybindBtn
 
 local waitingForKey = false
-
 keybindBtn.MouseButton1Click:Connect(function()
     if waitingForKey then return end
     keybindBtn.Text = "Pressione..."
     waitingForKey = true
-end)
-
-UserInputService.InputBegan:Connect(function(input, processed)
-    if not processed then
-        -- Keybind capture
-        if waitingForKey and input.UserInputType == Enum.UserInputType.Keyboard then
-            toggleKey = input.KeyCode
-            keybindBtn.Text = toggleKey.Name
-            waitingForKey = false
-        -- Toggle ESP com tecla configurada
-        elseif input.KeyCode == toggleKey and not waitingForKey and MainFrame.Visible then
-            setESPState(not ESP_ENABLED)
-            updateToggleESPBtn()
-        -- Abrir/fechar menu com "P"
-        elseif input.KeyCode == Enum.KeyCode.P and not waitingForKey then
-            MainFrame.Visible = not MainFrame.Visible
-        end
-    end
 end)
 
 -- INFO TAB
@@ -405,7 +517,7 @@ infoLabel.Position = UDim2.new(0, 0, 0, 0)
 infoLabel.BackgroundTransparency = 1
 infoLabel.Font = Enum.Font.Gotham
 infoLabel.TextWrapped = true
-infoLabel.Text = "Menu ESP feito por Notzin.\n\nAba Esp: Ative/desative o ESP, escolha cor, configure tecla toggle.\nAba Main: Speed/JumpPower do seu personagem.\n\nMenu arredondado, abas laterais, abre/fecha com P."
+infoLabel.Text = "Menu ESP feito por Notzin.\n\nAba Esp: Ative/desative o ESP, escolha cor, configure tecla toggle.\nAba Main: Speed/JumpPower do seu personagem e modo Invisível (botão e tecla).\n\nMenu arredondado, abas laterais, abre/fecha com P."
 infoLabel.TextSize = 18
 infoLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
 infoLabel.ZIndex = 2
@@ -414,3 +526,62 @@ infoLabel.Parent = infoTab
 -- Inicializa exibindo Main tab
 showTab(1)
 MainFrame.Visible = true -- Menu começa visível
+
+-- TECLAS GLOBAIS PARA ESP E INVISÍVEL
+UserInputService.InputBegan:Connect(function(input, processed)
+    if not processed then
+        -- Keybind capture para ESP
+        if waitingForKey and input.UserInputType == Enum.UserInputType.Keyboard then
+            toggleKey = input.KeyCode
+            keybindBtn.Text = toggleKey.Name
+            waitingForKey = false
+        -- Keybind capture para Invisível
+        elseif waitingInvisKey and input.UserInputType == Enum.UserInputType.Keyboard then
+            INVIS_KEY = input.KeyCode
+            invisKeyBtn.Text = INVIS_KEY.Name
+            waitingInvisKey = false
+        -- Toggle ESP com tecla configurada (funciona sempre)
+        elseif input.KeyCode == toggleKey and not waitingForKey then
+            setESPState(not ESP_ENABLED)
+            updateToggleESPBtn()
+        -- Toggle Invisível com tecla configurada (funciona sempre)
+        elseif input.KeyCode == INVIS_KEY and not waitingInvisKey then
+            setInvisible(not INVIS_ENABLED)
+            updateInvisBtn()
+        -- Abrir/fechar menu com "P"
+        elseif input.KeyCode == Enum.KeyCode.P then
+            MainFrame.Visible = not MainFrame.Visible
+        end
+    end
+end)
+
+invisKeyBtn.MouseButton1Click:Connect(function()
+    if waitingInvisKey then return end
+    invisKeyBtn.Text = "Pressione..."
+    waitingInvisKey = true
+end)
+
+-- Não mexer menu ao arrastar sliders
+local origDraggable = MainFrame.Draggable
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        -- se o mouse estiver sobre sliderBG, não deixa draggable
+        local mouse = UserInputService:GetMouseLocation()
+        for _, obj in ipairs(mainTab:GetChildren()) do
+            if obj:IsA("Frame") and obj.AbsoluteSize.Y == 12 then
+                local abs = obj.AbsolutePosition
+                local size = obj.AbsoluteSize
+                if mouse.X >= abs.X and mouse.X <= abs.X+size.X and mouse.Y >= abs.Y and mouse.Y <= abs.Y+size.Y then
+                    MainFrame.Draggable = false
+                    return
+                end
+            end
+        end
+        MainFrame.Draggable = origDraggable
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        MainFrame.Draggable = origDraggable
+    end
+end)
