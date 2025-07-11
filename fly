@@ -1,0 +1,187 @@
+-- VARIÁVEIS FLY (adicione ao topo com as outras)
+local FLY_ENABLED = false
+local FLY_KEY = Enum.KeyCode.G
+local FLY_SPEED = 60
+local minFlySpeed = 10
+local maxFlySpeed = 200
+local flyConn = nil
+local waitingFlyKey = false
+
+-- Função para ativar/desativar fly
+local function setFly(state)
+    FLY_ENABLED = state
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.PlatformStand = state
+    end
+    if state then
+        if flyConn then flyConn:Disconnect() end
+        flyConn = game:GetService("RunService").RenderStepped:Connect(function()
+            local char = LocalPlayer.Character
+            if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+            local HRP = char.HumanoidRootPart
+            local cam = workspace.CurrentCamera
+            local moveVec = Vector3.new()
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVec = moveVec + cam.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVec = moveVec - cam.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVec = moveVec - cam.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVec = moveVec + cam.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveVec = moveVec + cam.CFrame.UpVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveVec = moveVec - cam.CFrame.UpVector end
+            if moveVec.Magnitude > 0 then
+                HRP.Velocity = moveVec.Unit * FLY_SPEED
+            else
+                HRP.Velocity = Vector3.new(0,0,0)
+            end
+        end)
+    else
+        if flyConn then flyConn:Disconnect() flyConn = nil end
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+            LocalPlayer.Character.Humanoid.PlatformStand = false
+            LocalPlayer.Character.HumanoidRootPart.Velocity = Vector3.new(0,0,0)
+        end
+    end
+end
+
+-- Adicione na aba Main, logo após JumpPower/Invisível:
+local flyBtn = Instance.new("TextButton")
+flyBtn.Size = UDim2.new(0, 180, 0, 38)
+flyBtn.Position = UDim2.new(0, 10, 0, 210) -- ajuste conforme seu layout
+flyBtn.BackgroundColor3 = Color3.fromRGB(40, 60, 100)
+flyBtn.Font = Enum.Font.GothamBold
+flyBtn.TextSize = 20
+flyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyBtn.AutoButtonColor = true
+flyBtn.Text = "Ativar Fly"
+flyBtn.ZIndex = 2
+flyBtn.Parent = mainTab
+local UICorner_fly = Instance.new("UICorner")
+UICorner_fly.CornerRadius = UDim.new(0, 8)
+UICorner_fly.Parent = flyBtn
+
+local function updateFlyBtn()
+    flyBtn.Text = FLY_ENABLED and "Desativar Fly" or "Ativar Fly"
+    flyBtn.BackgroundColor3 = FLY_ENABLED and Color3.fromRGB(80, 125, 180) or Color3.fromRGB(40, 60, 100)
+end
+flyBtn.MouseButton1Click:Connect(function()
+    setFly(not FLY_ENABLED)
+    updateFlyBtn()
+end)
+updateFlyBtn()
+
+-- SLIDER DE VELOCIDADE DE FLY
+local flySpeedLabel = Instance.new("TextLabel")
+flySpeedLabel.Size = UDim2.new(0, 120, 0, 24)
+flySpeedLabel.Position = UDim2.new(0, 10, 0, 258)
+flySpeedLabel.BackgroundTransparency = 1
+flySpeedLabel.Font = Enum.Font.Gotham
+flySpeedLabel.Text = "Velocidade Fly:"
+flySpeedLabel.TextSize = 17
+flySpeedLabel.TextColor3 = Color3.fromRGB(120,210,255)
+flySpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
+flySpeedLabel.ZIndex = 2
+flySpeedLabel.Parent = mainTab
+
+local flySpeedValue = Instance.new("TextLabel")
+flySpeedValue.Size = UDim2.new(0, 54, 0, 24)
+flySpeedValue.Position = UDim2.new(0, 130, 0, 258)
+flySpeedValue.BackgroundTransparency = 1
+flySpeedValue.Font = Enum.Font.GothamBold
+flySpeedValue.Text = tostring(FLY_SPEED)
+flySpeedValue.TextSize = 17
+flySpeedValue.TextColor3 = Color3.fromRGB(120,210,255)
+flySpeedValue.TextXAlignment = Enum.TextXAlignment.Left
+flySpeedValue.ZIndex = 2
+flySpeedValue.Parent = mainTab
+
+local flySpeedSliderBG = Instance.new("Frame")
+flySpeedSliderBG.Size = UDim2.new(0, 220, 0, 12)
+flySpeedSliderBG.Position = UDim2.new(0, 10, 0, 284)
+flySpeedSliderBG.BackgroundColor3 = Color3.fromRGB(40,40,60)
+flySpeedSliderBG.BorderSizePixel = 0
+flySpeedSliderBG.ZIndex = 2
+flySpeedSliderBG.Parent = mainTab
+local UICorner_BG = Instance.new("UICorner")
+UICorner_BG.CornerRadius = UDim.new(0, 6)
+UICorner_BG.Parent = flySpeedSliderBG
+
+local flySpeedSliderFill = Instance.new("Frame")
+flySpeedSliderFill.Size = UDim2.new((FLY_SPEED-minFlySpeed)/(maxFlySpeed-minFlySpeed),0,1,0)
+flySpeedSliderFill.BackgroundColor3 = Color3.fromRGB(110,210,255)
+flySpeedSliderFill.BorderSizePixel = 0
+flySpeedSliderFill.ZIndex = 2
+flySpeedSliderFill.Parent = flySpeedSliderBG
+local UICorner_Fill = Instance.new("UICorner")
+UICorner_Fill.CornerRadius = UDim.new(0, 6)
+UICorner_Fill.Parent = flySpeedSliderFill
+
+local draggingFlySpeed = false
+flySpeedSliderBG.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        draggingFlySpeed = true
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        draggingFlySpeed = false
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if draggingFlySpeed and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local x = math.clamp(input.Position.X - flySpeedSliderBG.AbsolutePosition.X, 0, flySpeedSliderBG.AbsoluteSize.X)
+        local pct = x/flySpeedSliderBG.AbsoluteSize.X
+        local value = math.floor(minFlySpeed + (maxFlySpeed-minFlySpeed)*pct + 0.5)
+        flySpeedSliderFill.Size = UDim2.new(pct,0,1,0)
+        flySpeedValue.Text = tostring(value)
+        FLY_SPEED = value
+    end
+end)
+
+-- FLY KEYBIND
+local flyKeyLabel = Instance.new("TextLabel")
+flyKeyLabel.Size = UDim2.new(0, 160, 0, 28)
+flyKeyLabel.Position = UDim2.new(0, 10, 0, 302)
+flyKeyLabel.BackgroundTransparency = 1
+flyKeyLabel.Font = Enum.Font.Gotham
+flyKeyLabel.Text = "Tecla Fly:"
+flyKeyLabel.TextSize = 18
+flyKeyLabel.TextColor3 = Color3.fromRGB(230, 210, 255)
+flyKeyLabel.ZIndex = 2
+flyKeyLabel.Parent = mainTab
+
+local flyKeyBtn = Instance.new("TextButton")
+flyKeyBtn.Size = UDim2.new(0, 70, 0, 28)
+flyKeyBtn.Position = UDim2.new(0, 172, 0, 302)
+flyKeyBtn.BackgroundColor3 = Color3.fromRGB(40, 20, 60)
+flyKeyBtn.Font = Enum.Font.GothamSemibold
+flyKeyBtn.TextSize = 18
+flyKeyBtn.TextColor3 = Color3.fromRGB(230, 210, 255)
+flyKeyBtn.Text = FLY_KEY.Name
+flyKeyBtn.ZIndex = 2
+flyKeyBtn.Parent = mainTab
+local UICorner_flyKey = Instance.new("UICorner")
+UICorner_flyKey.CornerRadius = UDim.new(0, 6)
+UICorner_flyKey.Parent = flyKeyBtn
+
+flyKeyBtn.MouseButton1Click:Connect(function()
+    if waitingFlyKey then return end
+    flyKeyBtn.Text = "Pressione..."
+    waitingFlyKey = true
+end)
+
+-- No UserInputService.InputBegan GLOBAL:
+UserInputService.InputBegan:Connect(function(input, processed)
+    if not processed then
+        -- Fly key capture
+        if waitingFlyKey and input.UserInputType == Enum.UserInputType.Keyboard then
+            FLY_KEY = input.KeyCode
+            flyKeyBtn.Text = FLY_KEY.Name
+            waitingFlyKey = false
+        -- Toggle Fly
+        elseif input.KeyCode == FLY_KEY and not waitingFlyKey then
+            setFly(not FLY_ENABLED)
+            updateFlyBtn()
+        end
+    end
+end)
