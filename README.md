@@ -1,44 +1,70 @@
-[--[[
-LocalScript para Roblox - GUI ESP Menu Ultra Customizado
-- Sliders: texto e valor lado a lado, barra embaixo, arredondados
-- Não move o menu quando arrasta o slider
-- Todas opções arredondadas
-- Opção Invisível: botão de ativar/desativar + escolher tecla; funciona com GUI fechado
-- Atalhos (ESP/Invisível) funcionam com GUI fechado
+--[[
+NotzinESPMenuV5.lua
+- Menu ESP ultra customizado (Main, Esp, Info)
+- Sliders: Speed, Jump Power
+- Botões: Invisível, Fly (ambos com keybind configurável, funcionam mesmo com menu fechado)
+- ESP Highlight: cor e keybind configurável
+- CHAMS: jogadores sempre visíveis pelas paredes (local/visual)
 - Menu arredondado, abas laterais, abre/fecha com P
---]]
+- Fly na aba Main, velocidade fixa (mude FLY_SPEED se quiser)
+- Skin Changer: Headless, Korblox, A Vingança do Alce (e reset de cada um)
+]]
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
-local TweenService = game:GetService("TweenService")
 
--- Configurações Highlight
-local ESP_ENABLED = false
-local HIGHLIGHT_NAME = "PurpleESP_Highlight"
-local toggleKey = Enum.KeyCode.F -- Tecla padrão ESP
-local highlightColor = "Roxo" -- Inicial
-local highlightColors = {
-    ["Roxo"] = {fill = Color3.fromRGB(128,0,128), outline = Color3.fromRGB(200,0,200)},
-    ["Amarelo"] = {fill = Color3.fromRGB(255,255,0), outline = Color3.fromRGB(255,255,90)},
-    ["Verde"] = {fill = Color3.fromRGB(0,255,0), outline = Color3.fromRGB(90,255,90)},
-    ["Azul"] = {fill = Color3.fromRGB(0,128,255), outline = Color3.fromRGB(0,200,255)},
-}
-local fillTransparency = 0.08
-local outlineTransparency = 0.0
+-- ====== FLY VARIÁVEIS ======
+local FLY_ENABLED = false
+local FLY_KEY = Enum.KeyCode.G
+local FLY_SPEED = 60
+local flyConn = nil
+local waitingFlyKey = false
 
--- Speed/Jump Config
-local walkSpeed = 16
-local jumpPower = 50
-local maxSpeed = 200
-local maxJump = 400
+local function setFly(state)
+    FLY_ENABLED = state
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.PlatformStand = state
+    end
+    if state then
+        if flyConn then flyConn:Disconnect() end
+        flyConn = RunService.RenderStepped:Connect(function()
+            local char = LocalPlayer.Character
+            if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+            local HRP = char.HumanoidRootPart
+            local cam = workspace.CurrentCamera
+            local moveVec = Vector3.new()
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVec = moveVec + cam.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVec = moveVec - cam.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVec = moveVec - cam.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVec = moveVec + cam.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveVec = moveVec + cam.CFrame.UpVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveVec = moveVec - cam.CFrame.UpVector end
+            if moveVec.Magnitude > 0 then
+                HRP.Velocity = moveVec.Unit * FLY_SPEED
+            else
+                HRP.Velocity = Vector3.new(0,0,0)
+            end
+        end)
+    else
+        if flyConn then flyConn:Disconnect() flyConn = nil end
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+            LocalPlayer.Character.Humanoid.PlatformStand = false
+            LocalPlayer.Character.HumanoidRootPart.Velocity = Vector3.new(0,0,0)
+        end
+    end
+end
+-- ====== /FLY ======
 
--- Invisível
+-- ====== INVISÍVEL ======
 local INVIS_ENABLED = false
 local INVIS_KEY = Enum.KeyCode.T
 local invisParts = {}
+local waitingInvisKey = false
 
--- Função para tornar invisível
 local function setInvisible(state)
     INVIS_ENABLED = state
     local char = LocalPlayer.Character
@@ -51,41 +77,42 @@ local function setInvisible(state)
                     end
                     part.Transparency = 1
                     part.CanCollide = false
-                    if part:IsA("Decal") then
-                        part.Transparency = 1
-                    end
                 else
                     if invisParts[part] then
                         part.Transparency = invisParts[part]
                         invisParts[part] = nil
                     end
                     part.CanCollide = true
-                    if part:IsA("Decal") then
-                        part.Transparency = 0
-                    end
                 end
             elseif part:IsA("Decal") then
-                if state then
-                    part.Transparency = 1
-                else
-                    part.Transparency = 0
-                end
+                part.Transparency = state and 1 or 0
             end
         end
         -- Esconde acessórios
         for _, acc in ipairs(char:GetChildren()) do
             if acc:IsA("Accessory") and acc:FindFirstChild("Handle") then
-                if state then
-                    acc.Handle.Transparency = 1
-                else
-                    acc.Handle.Transparency = 0
-                end
+                acc.Handle.Transparency = state and 1 or 0
             end
         end
     end
 end
+-- ====== /INVISÍVEL ======
 
--- ESP Highlight
+-- ====== ESP VARS ======
+local ESP_ENABLED = false
+local HIGHLIGHT_NAME = "PurpleESP_Highlight"
+local toggleKey = Enum.KeyCode.F -- Tecla padrão ESP
+local waitingForKey = false
+local highlightColor = "Roxo"
+local highlightColors = {
+    ["Roxo"] = {fill = Color3.fromRGB(128,0,128), outline = Color3.fromRGB(200,0,200)},
+    ["Amarelo"] = {fill = Color3.fromRGB(255,255,0), outline = Color3.fromRGB(255,255,90)},
+    ["Verde"] = {fill = Color3.fromRGB(0,255,0), outline = Color3.fromRGB(90,255,90)},
+    ["Azul"] = {fill = Color3.fromRGB(0,128,255), outline = Color3.fromRGB(0,200,255)},
+}
+local fillTransparency = 0.08
+local outlineTransparency = 0.0
+
 local function setESPState(state)
     ESP_ENABLED = state
     for _, player in ipairs(Players:GetPlayers()) do
@@ -142,16 +169,84 @@ Players.PlayerAdded:Connect(function(player)
         end
     end)
 end)
+-- ====== /ESP ======
 
--- GUI Construction
+-- ====== CHAMS VARS ======
+local CHAMS_ENABLED = false
+local chamsFolder = Instance.new("Folder")
+chamsFolder.Name = "ChamsFolder"
+chamsFolder.Parent = workspace
+
+local chamsColor = Color3.fromRGB(0, 255, 255)
+local chamsTransparency = 0.4
+
+local function setChams(state)
+    CHAMS_ENABLED = state
+    -- Remove chams antigos
+    for _, obj in ipairs(chamsFolder:GetChildren()) do
+        obj:Destroy()
+    end
+    if state then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                for _, part in ipairs(player.Character:GetDescendants()) do
+                    if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                        local cham = Instance.new("BoxHandleAdornment")
+                        cham.Adornee = part
+                        cham.Size = part.Size + Vector3.new(0.01,0.01,0.01)
+                        cham.AlwaysOnTop = true
+                        cham.ZIndex = 10
+                        cham.Color3 = chamsColor
+                        cham.Transparency = chamsTransparency
+                        cham.Parent = chamsFolder
+                    end
+                end
+            end
+        end
+    end
+end
+
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function()
+        if CHAMS_ENABLED then
+            setChams(true)
+        end
+    end)
+end)
+Players.PlayerRemoving:Connect(function()
+    if CHAMS_ENABLED then
+        setChams(true)
+    end
+end)
+RunService.RenderStepped:Connect(function()
+    if CHAMS_ENABLED then
+        setChams(true)
+    end
+end)
+-- ====== /CHAMS ======
+
+-- ====== SPEED/JUMP ======
+local walkSpeed = 16
+local jumpPower = 50
+local maxSpeed = 200
+local maxJump = 400
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    local hum = char:WaitForChild("Humanoid")
+    hum.WalkSpeed = walkSpeed
+    hum.JumpPower = jumpPower
+end)
+-- ====== /SPEED/JUMP ======
+
+-- ========== GUI ==========
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "NotzinESPMenu"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 430, 0, 320)
-MainFrame.Position = UDim2.new(0.5, -215, 0.4, -160)
+MainFrame.Size = UDim2.new(0, 430, 0, 370)
+MainFrame.Position = UDim2.new(0.5, -215, 0.4, -185)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25,25,32)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
@@ -163,7 +258,7 @@ local UICorner_Main = Instance.new("UICorner")
 UICorner_Main.CornerRadius = UDim.new(0, 18)
 UICorner_Main.Parent = MainFrame
 
--- Título centralizado
+-- Título
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 36)
 Title.Position = UDim2.new(0, 0, 0, 0)
@@ -188,7 +283,6 @@ local UICorner_sideBar = Instance.new("UICorner")
 UICorner_sideBar.CornerRadius = UDim.new(0, 14)
 UICorner_sideBar.Parent = sideBar
 
--- Abas
 local tabNames = {"Main", "Esp", "Info"}
 local tabButtons = {}
 local tabContents = {}
@@ -228,7 +322,7 @@ for i, name in ipairs(tabNames) do
     tabContents[i] = content
 end
 
--- MAIN TAB: Sliders e Invisível
+---------------- MAIN TAB ----------------
 local mainTab = tabContents[1]
 
 local function createSlider(labelText, minValue, maxValue, startValue, posY, callback, valueColor)
@@ -315,12 +409,6 @@ createSlider("Jump Power", 20, maxJump, jumpPower, 60, function(val)
     end
 end, Color3.fromRGB(255,220,100))
 
-LocalPlayer.CharacterAdded:Connect(function(char)
-    local hum = char:WaitForChild("Humanoid")
-    hum.WalkSpeed = walkSpeed
-    hum.JumpPower = jumpPower
-end)
-
 -- Invisível
 local invisBtn = Instance.new("TextButton")
 invisBtn.Size = UDim2.new(0, 180, 0, 38)
@@ -347,7 +435,6 @@ invisBtn.MouseButton1Click:Connect(function()
 end)
 updateInvisBtn()
 
--- Invisível Keybind
 local invisKeyLabel = Instance.new("TextLabel")
 invisKeyLabel.Size = UDim2.new(0, 160, 0, 28)
 invisKeyLabel.Position = UDim2.new(0, 10, 0, 170)
@@ -373,14 +460,249 @@ local UICorner_invisKey = Instance.new("UICorner")
 UICorner_invisKey.CornerRadius = UDim.new(0, 6)
 UICorner_invisKey.Parent = invisKeyBtn
 
-local waitingInvisKey = false
 invisKeyBtn.MouseButton1Click:Connect(function()
     if waitingInvisKey then return end
     invisKeyBtn.Text = "Pressione..."
     waitingInvisKey = true
 end)
 
--- ESP TAB
+-- FLY
+local flyBtn = Instance.new("TextButton")
+flyBtn.Size = UDim2.new(0, 180, 0, 38)
+flyBtn.Position = UDim2.new(0, 10, 0, 210)
+flyBtn.BackgroundColor3 = Color3.fromRGB(40, 60, 100)
+flyBtn.Font = Enum.Font.GothamBold
+flyBtn.TextSize = 20
+flyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyBtn.AutoButtonColor = true
+flyBtn.Text = "Ativar Fly"
+flyBtn.ZIndex = 2
+flyBtn.Parent = mainTab
+local UICorner_fly = Instance.new("UICorner")
+UICorner_fly.CornerRadius = UDim.new(0, 8)
+UICorner_fly.Parent = flyBtn
+
+local function updateFlyBtn()
+    flyBtn.Text = FLY_ENABLED and "Desativar Fly" or "Ativar Fly"
+    flyBtn.BackgroundColor3 = FLY_ENABLED and Color3.fromRGB(80, 125, 180) or Color3.fromRGB(40, 60, 100)
+end
+flyBtn.MouseButton1Click:Connect(function()
+    setFly(not FLY_ENABLED)
+    updateFlyBtn()
+end)
+updateFlyBtn()
+
+local flyKeyLabel = Instance.new("TextLabel")
+flyKeyLabel.Size = UDim2.new(0, 160, 0, 28)
+flyKeyLabel.Position = UDim2.new(0, 10, 0, 256)
+flyKeyLabel.BackgroundTransparency = 1
+flyKeyLabel.Font = Enum.Font.Gotham
+flyKeyLabel.Text = "Tecla Fly:"
+flyKeyLabel.TextSize = 18
+flyKeyLabel.TextColor3 = Color3.fromRGB(230, 210, 255)
+flyKeyLabel.ZIndex = 2
+flyKeyLabel.Parent = mainTab
+
+local flyKeyBtn = Instance.new("TextButton")
+flyKeyBtn.Size = UDim2.new(0, 70, 0, 28)
+flyKeyBtn.Position = UDim2.new(0, 172, 0, 256)
+flyKeyBtn.BackgroundColor3 = Color3.fromRGB(40, 20, 60)
+flyKeyBtn.Font = Enum.Font.GothamSemibold
+flyKeyBtn.TextSize = 18
+flyKeyBtn.TextColor3 = Color3.fromRGB(230, 210, 255)
+flyKeyBtn.Text = FLY_KEY.Name
+flyKeyBtn.ZIndex = 2
+flyKeyBtn.Parent = mainTab
+local UICorner_flyKey = Instance.new("UICorner")
+UICorner_flyKey.CornerRadius = UDim.new(0, 6)
+UICorner_flyKey.Parent = flyKeyBtn
+
+flyKeyBtn.MouseButton1Click:Connect(function()
+    if waitingFlyKey then return end
+    flyKeyBtn.Text = "Pressione..."
+    waitingFlyKey = true
+end)
+
+-- SKIN CHANGER: Headless, Korblox, Alce
+local headlessBtn = Instance.new("TextButton")
+headlessBtn.Size = UDim2.new(0, 180, 0, 36)
+headlessBtn.Position = UDim2.new(0, 10, 0, 300)
+headlessBtn.BackgroundColor3 = Color3.fromRGB(55, 40, 100)
+headlessBtn.Font = Enum.Font.GothamBold
+headlessBtn.TextSize = 18
+headlessBtn.TextColor3 = Color3.fromRGB(255,255,255)
+headlessBtn.Text = "Ativar Headless"
+headlessBtn.AutoButtonColor = true
+headlessBtn.ZIndex = 2
+headlessBtn.Parent = mainTab
+local UICorner_headless = Instance.new("UICorner")
+UICorner_headless.CornerRadius = UDim.new(0, 8)
+UICorner_headless.Parent = headlessBtn
+
+local resetHeadlessBtn = Instance.new("TextButton")
+resetHeadlessBtn.Size = UDim2.new(0, 180, 0, 28)
+resetHeadlessBtn.Position = UDim2.new(0, 10, 0, 340)
+resetHeadlessBtn.BackgroundColor3 = Color3.fromRGB(80, 30, 50)
+resetHeadlessBtn.Font = Enum.Font.Gotham
+resetHeadlessBtn.TextSize = 16
+resetHeadlessBtn.TextColor3 = Color3.fromRGB(255, 220, 220)
+resetHeadlessBtn.Text = "Reset Headless"
+resetHeadlessBtn.AutoButtonColor = true
+resetHeadlessBtn.ZIndex = 2
+resetHeadlessBtn.Parent = mainTab
+local UICorner_headlessReset = Instance.new("UICorner")
+UICorner_headlessReset.CornerRadius = UDim.new(0, 8)
+UICorner_headlessReset.Parent = resetHeadlessBtn
+
+headlessBtn.MouseButton1Click:Connect(function()
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("Head") then
+        char.Head.Transparency = 1
+        for _,child in ipairs(char.Head:GetChildren()) do
+            if child:IsA("Decal") or child:IsA("FaceInstance") then
+                child.Transparency = 1
+            end
+        end
+    end
+end)
+resetHeadlessBtn.MouseButton1Click:Connect(function()
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("Head") then
+        char.Head.Transparency = 0
+        for _,child in ipairs(char.Head:GetChildren()) do
+            if child:IsA("Decal") or child:IsA("FaceInstance") then
+                child.Transparency = 0
+            end
+        end
+    end
+end)
+
+local korbloxBtn = Instance.new("TextButton")
+korbloxBtn.Size = UDim2.new(0, 180, 0, 36)
+korbloxBtn.Position = UDim2.new(0, 220, 0, 300)
+korbloxBtn.BackgroundColor3 = Color3.fromRGB(55, 80, 120)
+korbloxBtn.Font = Enum.Font.GothamBold
+korbloxBtn.TextSize = 18
+korbloxBtn.TextColor3 = Color3.fromRGB(255,255,255)
+korbloxBtn.Text = "Ativar Korblox"
+korbloxBtn.AutoButtonColor = true
+korbloxBtn.ZIndex = 2
+korbloxBtn.Parent = mainTab
+local UICorner_korblox = Instance.new("UICorner")
+UICorner_korblox.CornerRadius = UDim.new(0, 8)
+UICorner_korblox.Parent = korbloxBtn
+
+local resetKorbloxBtn = Instance.new("TextButton")
+resetKorbloxBtn.Size = UDim2.new(0, 180, 0, 28)
+resetKorbloxBtn.Position = UDim2.new(0, 220, 0, 340)
+resetKorbloxBtn.BackgroundColor3 = Color3.fromRGB(80, 55, 100)
+resetKorbloxBtn.Font = Enum.Font.Gotham
+resetKorbloxBtn.TextSize = 16
+resetKorbloxBtn.TextColor3 = Color3.fromRGB(220, 240, 255)
+resetKorbloxBtn.Text = "Reset Korblox"
+resetKorbloxBtn.AutoButtonColor = true
+resetKorbloxBtn.ZIndex = 2
+resetKorbloxBtn.Parent = mainTab
+local UICorner_korbloxReset = Instance.new("UICorner")
+UICorner_korbloxReset.CornerRadius = UDim.new(0, 8)
+UICorner_korbloxReset.Parent = resetKorbloxBtn
+
+local origKorbloxMesh, origKorbloxTex
+korbloxBtn.MouseButton1Click:Connect(function()
+    local char = LocalPlayer.Character
+    if char then
+        local rleg = char:FindFirstChild("RightLowerLeg") or char:FindFirstChild("Right Leg")
+        local rfoot = char:FindFirstChild("RightFoot")
+        if rleg and rleg:IsA("MeshPart") then
+            if not origKorbloxMesh then origKorbloxMesh = rleg.MeshId end
+            if not origKorbloxTex then origKorbloxTex = rleg.TextureID end
+            rleg.MeshId = "902942093"
+            rleg.TextureID = "902843398"
+        end
+        if rfoot and rfoot:IsA("MeshPart") then
+            rfoot.MeshId = "902942093"
+            rfoot.TextureID = "902843398"
+        end
+    end
+end)
+resetKorbloxBtn.MouseButton1Click:Connect(function()
+    local char = LocalPlayer.Character
+    if char then
+        local rleg = char:FindFirstChild("RightLowerLeg") or char:FindFirstChild("Right Leg")
+        local rfoot = char:FindFirstChild("RightFoot")
+        if rleg and rleg:IsA("MeshPart") and origKorbloxMesh and origKorbloxTex then
+            rleg.MeshId = origKorbloxMesh
+            rleg.TextureID = origKorbloxTex
+        end
+        if rfoot and rfoot:IsA("MeshPart") and origKorbloxMesh and origKorbloxTex then
+            rfoot.MeshId = origKorbloxMesh
+            rfoot.TextureID = origKorbloxTex
+        end
+    end
+end)
+
+-- ALCE
+local mooseBtn = Instance.new("TextButton")
+mooseBtn.Size = UDim2.new(0, 180, 0, 36)
+mooseBtn.Position = UDim2.new(0, 10, 0, 380)
+mooseBtn.BackgroundColor3 = Color3.fromRGB(80, 60, 30)
+mooseBtn.Font = Enum.Font.GothamBold
+mooseBtn.TextSize = 17
+mooseBtn.TextColor3 = Color3.fromRGB(255,255,230)
+mooseBtn.Text = "Ativar Alce"
+mooseBtn.AutoButtonColor = true
+mooseBtn.ZIndex = 2
+mooseBtn.Parent = mainTab
+local UICorner3 = Instance.new("UICorner")
+UICorner3.CornerRadius = UDim.new(0, 10)
+UICorner3.Parent = mooseBtn
+local resetMooseBtn = Instance.new("TextButton")
+resetMooseBtn.Size = UDim2.new(0, 180, 0, 24)
+resetMooseBtn.Position = UDim2.new(0, 10, 0, 420)
+resetMooseBtn.BackgroundColor3 = Color3.fromRGB(110, 90, 60)
+resetMooseBtn.Font = Enum.Font.Gotham
+resetMooseBtn.TextSize = 15
+resetMooseBtn.TextColor3 = Color3.fromRGB(255,255,230)
+resetMooseBtn.Text = "Reset Alce"
+resetMooseBtn.AutoButtonColor = true
+resetMooseBtn.ZIndex = 2
+resetMooseBtn.Parent = mainTab
+local UICorner3b = Instance.new("UICorner")
+UICorner3b.CornerRadius = UDim.new(0, 10)
+UICorner3b.Parent = resetMooseBtn
+
+mooseBtn.MouseButton1Click:Connect(function()
+    local char = LocalPlayer.Character
+    if char then
+        if char:FindFirstChild("A Vingança do Alce") then return end
+        local acc = Instance.new("Accessory")
+        acc.Name = "A Vingança do Alce"
+        local handle = Instance.new("Part")
+        handle.Name = "Handle"
+        handle.Size = Vector3.new(1,1,1)
+        handle.Parent = acc
+        local mesh = Instance.new("SpecialMesh")
+        mesh.MeshType = Enum.MeshType.FileMesh
+        mesh.MeshId = "rbxassetid://55318094"
+        mesh.TextureId = "rbxassetid://55318060"
+        mesh.Parent = handle
+        handle.Massless = true
+        handle.CanCollide = false
+        handle.Transparency = 0
+        acc.Parent = char
+        pcall(function() acc.AttachmentPoint = CFrame.new(0, 0.3, 0) end)
+    end
+end)
+resetMooseBtn.MouseButton1Click:Connect(function()
+    local char = LocalPlayer.Character
+    if char then
+        if char:FindFirstChild("A Vingança do Alce") then
+            char["A Vingança do Alce"]:Destroy()
+        end
+    end
+end)
+
+---------------- ESP TAB ----------------
 local EspTab = tabContents[2]
 
 local toggleESPBtn = Instance.new("TextButton")
@@ -407,7 +729,6 @@ toggleESPBtn.MouseButton1Click:Connect(function()
 end)
 updateToggleESPBtn()
 
--- Seletor de cor do highlight
 local colorLabel = Instance.new("TextLabel")
 colorLabel.Size = UDim2.new(0, 140, 0, 26)
 colorLabel.Position = UDim2.new(0, 8, 0, 62)
@@ -428,7 +749,7 @@ colorDropdown.Font = Enum.Font.GothamSemibold
 colorDropdown.TextSize = 18
 colorDropdown.TextColor3 = Color3.fromRGB(230, 210, 255)
 colorDropdown.Text = highlightColor
-colorDropdown.ZIndex = 3 -- ZIndex alto para ficar sobre qualquer outro
+colorDropdown.ZIndex = 3
 colorDropdown.Parent = EspTab
 local UICorner_colorDropdown = Instance.new("UICorner")
 UICorner_colorDropdown.CornerRadius = UDim.new(0, 6)
@@ -441,7 +762,7 @@ colorOptionsFrame.Position = UDim2.new(0, 0, 0, 26)
 colorOptionsFrame.BackgroundColor3 = Color3.fromRGB(30, 15, 45)
 colorOptionsFrame.BorderSizePixel = 0
 colorOptionsFrame.Visible = false
-colorOptionsFrame.ZIndex = 4 -- Acima de tudo
+colorOptionsFrame.ZIndex = 4
 colorOptionsFrame.Parent = colorDropdown
 local UICorner_colorFrame = Instance.new("UICorner")
 UICorner_colorFrame.CornerRadius = UDim.new(0,6)
@@ -476,7 +797,6 @@ colorDropdown.MouseButton1Click:Connect(function()
     colorDropdown.ZIndex = dropOpen and 5 or 3
 end)
 
--- Keybind setting
 local keybindLabel = Instance.new("TextLabel")
 keybindLabel.Size = UDim2.new(0, 160, 0, 28)
 keybindLabel.Position = UDim2.new(0, 8, 0, 102)
@@ -502,14 +822,39 @@ local UICorner_keybindBtn = Instance.new("UICorner")
 UICorner_keybindBtn.CornerRadius = UDim.new(0, 6)
 UICorner_keybindBtn.Parent = keybindBtn
 
-local waitingForKey = false
 keybindBtn.MouseButton1Click:Connect(function()
     if waitingForKey then return end
     keybindBtn.Text = "Pressione..."
     waitingForKey = true
 end)
 
--- INFO TAB
+-- CHAMS BUTTON
+local chamsBtn = Instance.new("TextButton")
+chamsBtn.Size = UDim2.new(0, 180, 0, 38)
+chamsBtn.Position = UDim2.new(0, 8, 0, 144)
+chamsBtn.BackgroundColor3 = Color3.fromRGB(20, 120, 165)
+chamsBtn.Font = Enum.Font.GothamBold
+chamsBtn.TextSize = 20
+chamsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+chamsBtn.AutoButtonColor = true
+chamsBtn.Text = "Ativar Chams"
+chamsBtn.ZIndex = 2
+chamsBtn.Parent = EspTab
+local UICorner_chams = Instance.new("UICorner")
+UICorner_chams.CornerRadius = UDim.new(0, 8)
+UICorner_chams.Parent = chamsBtn
+
+local function updateChamsBtn()
+    chamsBtn.Text = CHAMS_ENABLED and "Desativar Chams" or "Ativar Chams"
+    chamsBtn.BackgroundColor3 = CHAMS_ENABLED and Color3.fromRGB(0, 190, 220) or Color3.fromRGB(20, 120, 165)
+end
+chamsBtn.MouseButton1Click:Connect(function()
+    setChams(not CHAMS_ENABLED)
+    updateChamsBtn()
+end)
+updateChamsBtn()
+
+---------------- INFO TAB ----------------
 local infoTab = tabContents[3]
 local infoLabel = Instance.new("TextLabel")
 infoLabel.Size = UDim2.new(1, 0, 1, 0)
@@ -517,7 +862,7 @@ infoLabel.Position = UDim2.new(0, 0, 0, 0)
 infoLabel.BackgroundTransparency = 1
 infoLabel.Font = Enum.Font.Gotham
 infoLabel.TextWrapped = true
-infoLabel.Text = "Menu ESP feito por Notzin.\n\nAba Esp: Ative/desative o ESP, escolha cor, configure tecla toggle.\nAba Main: Speed/JumpPower do seu personagem e modo Invisível (botão e tecla).\n\nMenu arredondado, abas laterais, abre/fecha com P."
+infoLabel.Text = "Menu ESP feito por Notzin.\n\nAba Esp: ESP, Chams, cor do ESP, tecla toggle.\nAba Main: Speed/JumpPower, Invisível, Fly, Skin Changer (Headless, Korblox, Alce).\nMenu arredondado, abas laterais, abre/fecha com P."
 infoLabel.TextSize = 18
 infoLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
 infoLabel.ZIndex = 2
@@ -525,47 +870,45 @@ infoLabel.Parent = infoTab
 
 -- Inicializa exibindo Main tab
 showTab(1)
-MainFrame.Visible = true -- Menu começa visível
+MainFrame.Visible = true
 
--- TECLAS GLOBAIS PARA ESP E INVISÍVEL
+-- ========== ATALHOS GLOBAIS ==========
 UserInputService.InputBegan:Connect(function(input, processed)
     if not processed then
-        -- Keybind capture para ESP
+        -- ESP keybind
         if waitingForKey and input.UserInputType == Enum.UserInputType.Keyboard then
             toggleKey = input.KeyCode
             keybindBtn.Text = toggleKey.Name
             waitingForKey = false
-        -- Keybind capture para Invisível
+        elseif input.KeyCode == toggleKey and not waitingForKey then
+            setESPState(not ESP_ENABLED)
+            updateToggleESPBtn()
+        -- Invisível keybind
         elseif waitingInvisKey and input.UserInputType == Enum.UserInputType.Keyboard then
             INVIS_KEY = input.KeyCode
             invisKeyBtn.Text = INVIS_KEY.Name
             waitingInvisKey = false
-        -- Toggle ESP com tecla configurada (funciona sempre)
-        elseif input.KeyCode == toggleKey and not waitingForKey then
-            setESPState(not ESP_ENABLED)
-            updateToggleESPBtn()
-        -- Toggle Invisível com tecla configurada (funciona sempre)
         elseif input.KeyCode == INVIS_KEY and not waitingInvisKey then
             setInvisible(not INVIS_ENABLED)
             updateInvisBtn()
-        -- Abrir/fechar menu com "P"
+        -- Fly keybind
+        elseif waitingFlyKey and input.UserInputType == Enum.UserInputType.Keyboard then
+            FLY_KEY = input.KeyCode
+            flyKeyBtn.Text = FLY_KEY.Name
+            waitingFlyKey = false
+        elseif input.KeyCode == FLY_KEY and not waitingFlyKey then
+            setFly(not FLY_ENABLED)
+            updateFlyBtn()
+        -- Abrir/fechar menu
         elseif input.KeyCode == Enum.KeyCode.P then
             MainFrame.Visible = not MainFrame.Visible
         end
     end
 end)
 
-invisKeyBtn.MouseButton1Click:Connect(function()
-    if waitingInvisKey then return end
-    invisKeyBtn.Text = "Pressione..."
-    waitingInvisKey = true
-end)
-
--- Não mexer menu ao arrastar sliders
 local origDraggable = MainFrame.Draggable
 MainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        -- se o mouse estiver sobre sliderBG, não deixa draggable
         local mouse = UserInputService:GetMouseLocation()
         for _, obj in ipairs(mainTab:GetChildren()) do
             if obj:IsA("Frame") and obj.AbsoluteSize.Y == 12 then
@@ -585,4 +928,3 @@ UserInputService.InputEnded:Connect(function(input)
         MainFrame.Draggable = origDraggable
     end
 end)
-](https://raw.githubusercontent.com/Notzin777/Skin-changer/refs/heads/main/README.md)
